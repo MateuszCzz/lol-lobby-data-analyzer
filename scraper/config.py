@@ -9,7 +9,7 @@ CHAMPION_NAMES: List[str] = [
 ]
 
 LANES: List[str] = [
-    "top", "jungle", "mid", "adc", "support"
+    "top", "jungle", "middle", "bottom", "support"
     ]
 
 
