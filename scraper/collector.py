@@ -4,10 +4,13 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
-from config import ScrapeConfig
+from config import ScrapeConfig, LANES
 from parser import parse_item
 
-DATA_XPATH = "/html/body/main/div[6]/div[1]/div[2]/div[2]"
+LANE_DIV_INDICES = [2, 3, 4, 5, 6]
+LANE_MAP = dict(zip(LANE_DIV_INDICES, LANES))
+
+LABEL_XPATH_TPL = "/html/body/main/div[6]/div[1]/div[{i}]/div[2]"
 NOT_FOUND_LOCATOR = (By.XPATH, "//main//span[contains(text(),'Resource Not Found')]")
 
 def build_url(champion: str, lane: str, tier: str) -> str:
@@ -35,14 +38,17 @@ def scroll_page(driver):
 
 def wait_for_page(driver, tag: str) -> bool:
     """Returns True if data is present, False if Resource Not Found page detected. Waits indefinitely."""
-    data_locator = (By.XPATH, DATA_XPATH)
-
-    WebDriverWait(driver, timeout=0.1).until(
-        EC.any_of(
-            EC.presence_of_element_located(data_locator),
-            EC.presence_of_element_located(NOT_FOUND_LOCATOR),
+    first_block = (By.XPATH, LABEL_XPATH_TPL.format(i=LANE_DIV_INDICES[0]))
+    try:
+        WebDriverWait(driver, 0.1).until(
+            EC.any_of(
+                EC.presence_of_element_located(first_block),
+                EC.presence_of_element_located(NOT_FOUND_LOCATOR),
+            )
         )
-    )
+    except Exception:
+        print(f"{tag} Timed out waiting for page")
+        return False
 
     if driver.find_elements(*NOT_FOUND_LOCATOR):
         print(f"{tag} Skipped — Resource Not Found")
@@ -51,43 +57,59 @@ def wait_for_page(driver, tag: str) -> bool:
     print(f"{tag} Data found — proceeding to scrape")
     return True
 
-def scrape_lane(driver, config: ScrapeConfig) -> Dict:
-    lane_data = {}
-    parent = WebDriverWait(driver, 5).until(
-        EC.presence_of_element_located((By.XPATH, DATA_XPATH))
-    )
-    for _ in range(config.scroll_iterations):
-        children = WebDriverWait(driver, 10).until(
-            EC.presence_of_all_elements_located((By.XPATH, f"{DATA_XPATH}/div[1]/*"))
+
+def scrape_block(driver, block_xpath: str, config: ScrapeConfig) -> Dict:
+    block_data: Dict = {}
+    try:
+        parent = WebDriverWait(driver, 5).until(
+            EC.presence_of_element_located((By.XPATH, block_xpath))
         )
+    except Exception:
+        return block_data
+
+    for _ in range(config.scroll_iterations):
+        children = driver.find_elements(By.XPATH, f"{block_xpath}/div[1]/*")
         for element in children:
             item = parse_item(element)
             name = item["name"]
-            if name not in ("error", "N/A") and name not in lane_data:
-                lane_data[name] = item
-        driver.execute_script("arguments[0].scrollLeft += 500;", parent)
+            if name not in ("error", "N/A") and name not in block_data:
+                block_data[name] = item
+
+        driver.execute_script("arguments[0].scrollLeft += 550;", parent)
         time.sleep(0.5)
-    return lane_data
 
-def scrape_champion(driver, champion: str, lane: str, config: ScrapeConfig):
+    return block_data
+
+def scrape_champion(driver, champion: str, lane: str, config: ScrapeConfig) -> Dict | None:
     tag = f"[{champion}/{lane}]"
-    url = build_url(champion, lane, config.tier)
-    driver.get(url)
+    driver.get(build_url(champion, lane, config.tier))
     scroll_page(driver)
-
     if not wait_for_page(driver, tag):
         return None
 
     pick_rate = get_pick_rate(driver)
     if pick_rate is None:
-        print(f"{tag} Skipped — pick rate could not be read (page may not have loaded correctly)")
+        print(f"{tag} Skipped — pick rate could not be read")
         return None
     if pick_rate < config.min_pick_rate:
-        print(f"{tag} Skipped — pick rate {pick_rate}% is below minimum {config.min_pick_rate}%")
+        print(f"{tag} Skipped — pick rate {pick_rate}% below minimum {config.min_pick_rate}%")
         return None
 
-    data = scrape_lane(driver, config)
-    if not data:
-        print(f"{tag} Scraped but returned no items — container may have been empty or all entries were invalid")
+    all_data: Dict = {}
 
-    return data or None
+    for i in LANE_DIV_INDICES:
+        block_xpath = LABEL_XPATH_TPL.format(i=i)
+        opp_lane = LANE_MAP[i]
+        block_data = scrape_block(driver, block_xpath, config)
+
+        if not block_data:
+            print(f"{tag} Block div[{i}] ({opp_lane}) — no items found, skipping")
+            continue
+
+        for item in block_data.values():
+            item["opponent_lane"] = opp_lane
+
+        all_data.update(block_data)
+        print(f"{tag} Block div[{i}] ({opp_lane}) — {len(block_data)} matchups scraped")
+
+    return all_data if all_data else None
