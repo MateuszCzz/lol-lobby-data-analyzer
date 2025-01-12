@@ -47,15 +47,22 @@ def chunk_tasks(tasks: list, n: int) -> list[list]:
 def main(workers: int):
     ensure_data_dir(DATA_DIR)
     config = ScrapeConfig()
-
     tasks = get_pending_tasks()
     if not tasks:
         print("Nothing to scrape — all files already exist")
         return
 
-    chunks = chunk_tasks(tasks, workers)
-    print(f"Scraping {len(tasks)} combos across {workers} workers")
+    # round up <1 to 1
+    workers = max(1, min(workers, len(tasks)))
 
+    print(f"Scraping {len(tasks)} combos across {workers} worker(s)")
+
+    if workers == 1:
+        # Skip thread pool entirely
+        worker(0, tasks, config)
+        return
+
+    chunks = chunk_tasks(tasks, workers)
     with ThreadPoolExecutor(max_workers=workers) as executor:
         futures = {executor.submit(worker, i, chunk, config): i for i, chunk in enumerate(chunks)}
         for future in as_completed(futures):
@@ -67,6 +74,6 @@ def main(workers: int):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("workers", type=int, default=5, nargs="?")
+    parser.add_argument("workers", type=int, default=1, nargs="?")
     args = parser.parse_args()
     main(args.workers)
