@@ -1,33 +1,36 @@
-# LoLalytics Scraper & Counters Finder
+# League of Legends Real-Time Lobby Analysis
 
-**LSCF** is a Python script designed to help you find the best champion choices in *League of Legends* by scraping champion data from the *LoLalytics* website. The data is then used to identify the best counter-picks based on the enemy team's composition.
+A Python based data-driven tool that collects and processes champion statistics from [LoLalytics](https://lolalytics.com), then queries the resulting datasets in real time during champion select to provide assistance in selecting optimal choices based on actions of the opposite players.
 
-## Features
-- Scrapes champion data from *Lolalytics* into JSON files.
-- Allows you to input enemy champion picks and receive suggestions for the best counter-picks based on real-time data.
+## Pipeline
 
-## Usage
+**Stage 1 — Data Collection**
 
-### Part 1: Scraping Data
+**1. Install dependencies**
+```bash
+pip install -r requirements.txt
+```
 
-1. **Run the scraper:**
-   The script will open a browser (using Selenium), navigate to the *Lolalytics* page, and retrieve relevant data for all champions.
-   
-   ```bash
-   python scraper.py X
-   ```
-   - X should be an integer between 0 and 5.
-   - 0 means data for all champions will be scraped.
-   - Numbers between 1 and 5 represent subsets of champions, allowing you to split the scraping into 5 simultaneous scripts.
+**2. Configure** (optional)
 
-   - The data will be stored in a structured format for easy access later.
+Open `config.py` to tune data collection parameters - tier bracket, minimum sample size, pick rate thresholds. Tighter filters may reduce noise by dropping matchups with insufficient game volume, at the cost of excluding more niche information.
 
-### Part 2: Managing Data in the Game Lobby
+**3. Run the collector**
+```bash
+python main.py [workers]
+```
 
-1. **Run the lobby manager:**
-   ```bash
-   python lobby_manager.py
-   ```
+Crawls LoLalytics across every champion and role combination, extracting and caching relevant information such as per-matchup win rates, game counts, and pick rates into local JSON datasets. The *optional* `workers` parameter controls the number of parallel browser instances - scale up to reduce collection time at the cost of higher resource consumption. Defaults to 1.
 
-2. **Input enemy champions:**
-   You can input the enemy team's champions as they are selected. The script will recommend optimal champions for your team to pick based on win rate and counter-pick data.
+---
+
+**Stage 2 — Live Draft Analysis**
+
+**4. Start the query engine**
+```bash
+python lobby_manager.py
+```
+
+**5. Feed picks as they happen**
+
+Enter enemy champions as they lock in. The engine queries the dataset on each input, aggregating matchup statistics across all known enemies to rank available picks by weighted win rate advantage.
