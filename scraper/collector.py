@@ -144,3 +144,35 @@ def scrape_champion(driver, champion: str, lane: str, config: ScrapeConfig) -> D
         print(f"{tag} Block div[{i}] ({opp_lane}) — {len(block_data)} matchups scraped")
 
     return all_data if all_data else None
+
+def scrape_play_rates(config: ScrapeConfig) -> dict:
+    from config import CHAMPION_NAMES
+    from driver import create_driver
+
+    driver = create_driver()
+    results: dict = {}
+
+    try:
+        for champion in CHAMPION_NAMES:
+            results[champion] = {}
+            for lane in LANES:
+                tag = f"[play_rates/{champion}/{lane}]"
+                try:
+                    driver.get(build_url(champion, lane, config.tier))
+
+                    if driver.find_elements(*NOT_FOUND_LOCATOR):
+                        print(f"{tag} Not Found — writing 0")
+                        results[champion][lane] = 0
+                        continue
+
+                    pick_rate = get_pick_rate(driver)
+                    results[champion][lane] = pick_rate or 0
+                    print(f"{tag} {results[champion][lane]}%")
+
+                except Exception as e:
+                    print(f"{tag} Error ({e}) — writing 0")
+                    results[champion][lane] = 0
+    finally:
+        driver.quit()
+
+    return results

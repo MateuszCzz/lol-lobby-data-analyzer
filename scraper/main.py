@@ -2,8 +2,10 @@ import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from config import CHAMPION_NAMES, LANES, DATA_DIR, ScrapeConfig
 from driver import create_driver
-from collector import scrape_champion
+from collector import scrape_champion, scrape_play_rates
 from storage import ensure_data_dir, save_json
+
+PLAY_RATES_FILE = DATA_DIR / "000_play_rates.json"
 
 def get_pending_tasks() -> list[tuple[str, str]]:
     return [
@@ -47,6 +49,15 @@ def chunk_tasks(tasks: list, n: int) -> list[list]:
 def main(workers: int):
     ensure_data_dir(DATA_DIR)
     config = ScrapeConfig()
+    
+    if PLAY_RATES_FILE.exists():
+        print("000_play_rates.json already exists — skipping play rate scrape")
+    else:
+        print("Scraping play rates for all champions × lanes …")
+        play_rates = scrape_play_rates(config)
+        save_json(PLAY_RATES_FILE, play_rates)
+        print(f"Play rates saved → {PLAY_RATES_FILE}")
+
     tasks = get_pending_tasks()
     if not tasks:
         print("Nothing to scrape — all files already exist")
