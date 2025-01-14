@@ -17,6 +17,6 @@ LANES: List[str] = [
 class ScrapeConfig:
     tier: str = "diamond_plus"
     min_pick_rate: float = 0 # minimal % of given role i. e. for n = 0.5, ahri 99.6% mid, only 0.4% support gets skipped
-    min_champion_games: int = 5000 # minimal amount of games of given champion on given role to keep i. e. Renekton+Support > n
+    min_champion_games: int = 2500 # minimal amount of games of given champion on given role to keep i. e. Renekton+Support > n
     scroll_iterations: int = 6 # amount of sideways scrolls, adding more will add more match ups data, highly adviced to combine with below for clean output
     min_games: int = 25  # minmal amount of games for match up to stay, i. e. Renekton+top into ahri+adc > n, minimal amount required to remove outliers
