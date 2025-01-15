@@ -7,5 +7,6 @@ def ensure_data_dir(path: Path) -> None:
 
 
 def save_json(path: Path, data: dict) -> None:
+    path = path.with_name(path.name.lower()) 
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4)
