@@ -172,6 +172,14 @@ def scrape_play_rates(config: ScrapeConfig) -> dict:
                 except Exception as e:
                     print(f"{tag} Error ({e}) — writing 0")
                     results[champion][lane] = 0
+
+            # Normalize to 100%
+            total = sum(results[champion].values())
+            if total > 0:
+                results[champion] = {
+                    lane: round(rate / total * 100, 2)
+                    for lane, rate in results[champion].items()
+                }
     finally:
         driver.quit()
 
