@@ -1,11 +1,9 @@
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from config import CHAMPION_NAMES, LANES, DATA_DIR, ScrapeConfig
-from driver import create_driver
-from collector import scrape_champion, scrape_play_rates
-from storage import ensure_data_dir, save_json
-
-PLAY_RATES_FILE = DATA_DIR / "000_play_rates.json"
+from config import CHAMPION_NAMES, LANES, DATA_DIR, ScrapeConfig, PLAY_RATES_FILE
+from scraper.driver import create_driver
+from scraper.collector import scrape_champion, scrape_play_rates
+from scraper.storage import ensure_data_dir, save_json
 
 def get_pending_tasks() -> list[tuple[str, str]]:
     return [

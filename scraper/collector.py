@@ -5,7 +5,9 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
 from config import ScrapeConfig, LANES
-from parser import parse_item
+from scraper.parser import parse_item
+from config import CHAMPION_NAMES
+from scraper.driver import create_driver
 
 LANE_DIV_INDICES = [2, 3, 4, 5, 6]
 LANE_MAP = dict(zip(LANE_DIV_INDICES, LANES))
@@ -146,9 +148,6 @@ def scrape_champion(driver, champion: str, lane: str, config: ScrapeConfig) -> D
     return all_data if all_data else None
 
 def scrape_play_rates(config: ScrapeConfig) -> dict:
-    from config import CHAMPION_NAMES
-    from driver import create_driver
-
     driver = create_driver()
     results: dict = {}
 
