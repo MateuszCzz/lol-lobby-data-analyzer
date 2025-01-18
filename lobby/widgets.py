@@ -10,7 +10,7 @@ PALETTE = {
     "accent":      "#c89b3c",   # gold accent
     "accent2":     "#1e90ff",   # electric blue
     "text":        "#cdd6f4",   # primary text — soft white
-    "text_dim":    "#7a8faa",   # secondary / muted text
+    "text_dim":    "#9aafc7",   # secondary / muted text
     "header_bg":   "#122030",   # Treeview header background
     "row_even":    "#0f1923",
     "row_odd":     "#0d1720",
@@ -40,6 +40,7 @@ class SortableTreeview(ttk.Treeview):
 
     def __init__(self, parent, columns: tuple[str, ...], **kwargs):
         super().__init__(parent, columns=columns, show="headings", **kwargs)
+        self.configure(style="Treeview")
         self._sort_state: dict[str, bool] = {}
         for col in columns:
             self.heading(
@@ -143,7 +144,7 @@ def apply_dark_theme(root: tk.Tk) -> ttk.Style:
     style = ttk.Style(root)
     style.theme_use("clam")
 
-    # --- Treeview ---
+    # Treeview 
     style.configure(
         "Treeview",
         background=PALETTE["panel"],
@@ -172,6 +173,8 @@ def apply_dark_theme(root: tk.Tk) -> ttk.Style:
         "Treeview.Heading",
         background=[("active", PALETTE["border"])],
     )
+
+    # Combobox
     style.configure(
         "TCombobox",
         fieldbackground=PALETTE["entry_bg"],
@@ -179,7 +182,7 @@ def apply_dark_theme(root: tk.Tk) -> ttk.Style:
         foreground=PALETTE["text"],
         arrowcolor=PALETTE["accent"],
         bordercolor=PALETTE["border"],
-        lightcolor=PALETTE["entry_bg"],   # suppress 3-D highlight edges
+        lightcolor=PALETTE["entry_bg"],
         darkcolor=PALETTE["entry_bg"],
         selectbackground=PALETTE["select"],
         selectforeground=PALETTE["text"],
@@ -235,17 +238,39 @@ def apply_dark_theme(root: tk.Tk) -> ttk.Style:
         darkcolor=PALETTE["scroll_thumb"],
         arrowcolor=PALETTE["scroll_thumb_hover"],
         relief="flat",
-        width=6,
         arrowsize=6,
     )
-    style.map(
-        "Horizontal.TScrollbar",
-        background=[
-            ("active",   PALETTE["scroll_thumb_hover"]),
-            ("pressed",  PALETTE["accent"]),
-            ("disabled", PALETTE["scroll_trough"]),
-        ],
-    )
+    
+    style.configure("Vertical.TScrollbar",   width=6,  **_sb_common) # type: ignore[arg-type]
+    style.configure("Horizontal.TScrollbar", width=6,  **_sb_common) # type: ignore[arg-type]
+
+    _sb_map = [
+        ("active",   PALETTE["scroll_thumb_hover"]),
+        ("pressed",  PALETTE["scroll_thumb_hover"]),
+        ("disabled", PALETTE["scroll_trough"]),
+    ]
+    for _sb in ("Vertical.TScrollbar", "Horizontal.TScrollbar"):
+        style.map(
+            _sb,
+            background=_sb_map,
+            bordercolor=[
+                ("active",  PALETTE["scroll_thumb_hover"]),
+                ("pressed", PALETTE["scroll_thumb_hover"]),
+            ],
+            lightcolor=[
+                ("active",  PALETTE["scroll_thumb_hover"]),
+                ("pressed", PALETTE["scroll_thumb_hover"]),
+            ],
+            darkcolor=[
+                ("active",  PALETTE["scroll_thumb_hover"]),
+                ("pressed", PALETTE["scroll_thumb_hover"]),
+            ],
+            arrowcolor=[
+                ("active",  PALETTE["text_dim"]),
+                ("pressed", PALETTE["text_dim"]),
+            ],
+            troughcolor=[("active", PALETTE["scroll_trough"])],
+        )
 
     style.configure(
         "TNotebook",
