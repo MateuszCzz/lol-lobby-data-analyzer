@@ -21,3 +21,4 @@ class ScrapeConfig:
     min_champion_games: int = 2500 # minimal amount of games of given champion on given role to keep i. e. Renekton+Support > n
     scroll_iterations: int = 6 # amount of sideways scrolls, adding more will add more match ups data, highly adviced to combine with below for clean output
     min_games: int = 25  # minmal amount of games for match up to stay, i. e. Renekton+top into ahri+adc > n, minimal amount required to remove outliers
+    play_rate_chunks: int = 10  # amount of groups to split champions into when play rate scraping, file is saved after each chunk

@@ -147,39 +147,34 @@ def scrape_champion(driver, champion: str, lane: str, config: ScrapeConfig) -> D
 
     return all_data if all_data else None
 
-def scrape_play_rates(config: ScrapeConfig) -> dict:
-    driver = create_driver()
+def scrape_play_rates(driver, champions: list[str], config: ScrapeConfig) -> dict:
     results: dict = {}
 
-    try:
-        for champion in CHAMPION_NAMES:
-            results[champion] = {}
-            for lane in LANES:
-                tag = f"[play_rates/{champion}/{lane}]"
-                try:
-                    driver.get(build_url(champion, lane, config.tier))
-
-                    if driver.find_elements(*NOT_FOUND_LOCATOR):
-                        print(f"{tag} Not Found — writing 0")
-                        results[champion][lane] = 0
-                        continue
-
-                    pick_rate = get_pick_rate(driver)
-                    results[champion][lane] = pick_rate or 0
-                    print(f"{tag} {results[champion][lane]}%")
-
-                except Exception as e:
-                    print(f"{tag} Error ({e}) — writing 0")
+    for champion in champions:
+        results[champion] = {}
+        for lane in LANES:
+            tag = f"[play_rates/{champion}/{lane}]"
+            try:
+                driver.get(build_url(champion, lane, config.tier))
+ 
+                if driver.find_elements(*NOT_FOUND_LOCATOR):
+                    print(f"{tag} Not Found — writing 0")
                     results[champion][lane] = 0
-
-            # Normalize to 100%
-            total = sum(results[champion].values())
-            if total > 0:
-                results[champion] = {
-                    lane: round(rate / total * 100, 2)
-                    for lane, rate in results[champion].items()
-                }
-    finally:
-        driver.quit()
-
+                    continue
+ 
+                pick_rate = get_pick_rate(driver)
+                results[champion][lane] = pick_rate or 0
+                print(f"{tag} {results[champion][lane]}%")
+ 
+            except Exception as e:
+                print(f"{tag} Error ({e}) — writing 0")
+                results[champion][lane] = 0
+ 
+        # Normalize to 100%
+        total = sum(results[champion].values())
+        if total > 0:
+            results[champion] = {
+                lane: round(rate / total * 100, 2)
+                for lane, rate in results[champion].items()
+            }
     return results

@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from config import CHAMPION_NAMES, LANES, DATA_DIR, ScrapeConfig, PLAY_RATES_FILE
 from scraper.driver import create_driver
 from scraper.collector import scrape_champion, scrape_play_rates
-from scraper.storage import ensure_data_dir, save_json
+from scraper.storage import ensure_data_dir, save_json, load_completed_champions
 
 def get_pending_tasks() -> list[tuple[str, str]]:
     return [
@@ -44,17 +44,43 @@ def chunk_tasks(tasks: list, n: int) -> list[list]:
         chunks[n - 1].extend(chunks.pop())
     return chunks
 
+def play_rate_scrape(cfg: ScrapeConfig) -> None:
+    completed, data = load_completed_champions(PLAY_RATES_FILE)
+ 
+    if completed == set(CHAMPION_NAMES):
+        print("Play rates already complete - skipping")
+        return
+ 
+    if completed:
+        print(f"Resuming play rates — {len(completed)}/{len(CHAMPION_NAMES)} already done")
+    else:
+        print("Starting play rate scrape")
+
+    # filtering out done champions    
+    pending = [c for c in CHAMPION_NAMES if c not in completed]
+    chunks = chunk_tasks(pending, cfg.play_rate_chunks)
+    print(f"{len(pending)} champions pending - {len(chunks)} chunks of {len(chunks[0])} each\n")
+ 
+    driver = create_driver()
+    try:
+        for idx, chunk in enumerate(chunks):
+            print(f"Chunk {idx + 1}/{len(chunks)}: {', '.join(chunk)}")
+            chunk_results = scrape_play_rates(driver, chunk, cfg)
+ 
+            data.update(chunk_results)
+            completed.update(chunk)
+            data["_completed"] = sorted(completed)
+            save_json(PLAY_RATES_FILE, data)
+            print(f"Chunk {idx + 1} saved — {len(completed)}/{len(CHAMPION_NAMES)} champions done\n")
+    finally:
+        driver.quit()
+ 
+    print(f"Play rates complete → {PLAY_RATES_FILE}")
+
 def main(workers: int):
     ensure_data_dir(DATA_DIR)
     config = ScrapeConfig()
-    
-    if PLAY_RATES_FILE.exists():
-        print("000_play_rates.json already exists — skipping play rate scrape")
-    else:
-        print("Scraping play rates for all champions × lanes …")
-        play_rates = scrape_play_rates(config)
-        save_json(PLAY_RATES_FILE, play_rates)
-        print(f"Play rates saved → {PLAY_RATES_FILE}")
+    play_rate_scrape(config)
 
     tasks = get_pending_tasks()
     if not tasks:
