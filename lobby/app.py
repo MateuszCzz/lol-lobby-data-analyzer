@@ -1,4 +1,5 @@
 from __future__ import annotations
+import sys
 import tkinter as tk
 from tkinter import messagebox, ttk
 from config import LANES
@@ -14,6 +15,36 @@ from lobby.widgets import (
     apply_dark_theme,
 )
 
+# win 11 color titlebar
+def _apply_dark_titlebar(root: tk.Tk) -> None:
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        
+        # Windows 10 20H1+
+        DWMWA_USE_IMMERSIVE_DARK_MODE = 20   
+
+        hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
+        value = ctypes.c_int(1)
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_USE_IMMERSIVE_DARK_MODE,
+            ctypes.byref(value),
+            ctypes.sizeof(value),
+        )
+
+        DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1 = 19
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1,
+            ctypes.byref(value),
+            ctypes.sizeof(value),
+        )
+    except Exception:
+        pass
+
+
 class LobbyManagerApp:
     COLUMNS = ("Name", "Popularity", "Games", "Win Rate Diff")
 
@@ -23,6 +54,10 @@ class LobbyManagerApp:
         self.root.resizable(True, True)
 
         apply_dark_theme(root)
+        # ensure the window handle exists
+        # apply dark sidebar
+        root.update()         
+        _apply_dark_titlebar(root)
 
         self._ctrl = LobbyController()
         self._build_ui()
