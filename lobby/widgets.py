@@ -7,7 +7,7 @@ PALETTE = {
     "bg":          "#0a0e17",   # near-black background
     "panel":       "#0f1923",   # slightly lighter panel
     "border":      "#1e3a5f",   # steel-blue border / separator
-    "accent":      "#c89b3c",   # gold accent (LoL UI gold)
+    "accent":      "#c89b3c",   # gold accent
     "accent2":     "#1e90ff",   # electric blue
     "text":        "#cdd6f4",   # primary text — soft white
     "text_dim":    "#7a8faa",   # secondary / muted text
@@ -21,12 +21,18 @@ PALETTE = {
     "entry_bg":    "#0d1720",
     "button_bg":   "#122030",
     "button_fg":   "#c89b3c",
+    "scroll_bg":   "#0d1720",
+    "scroll_trough": "#080c13",
+    "scroll_thumb": "#1e3a5f",
+    "scroll_thumb_hover": "#2a4f7a",
+    "scroll_arrow": "#c89b3c",
 }
 
-FONT_HEADER  = ("Courier New", 9, "bold")
-FONT_BODY    = ("Courier New", 8)
-FONT_TITLE   = ("Courier New", 11, "bold")
-FONT_SMALL   = ("Courier New", 7)
+FONT_HEADER  = ("Courier New", 11, "bold")
+FONT_BODY    = ("Courier New", 10)
+FONT_TITLE   = ("Courier New", 14, "bold")
+FONT_SMALL   = ("Courier New", 9)
+
 
 class SortableTreeview(ttk.Treeview):
 
@@ -41,8 +47,7 @@ class SortableTreeview(ttk.Treeview):
                 text=col,
                 command=lambda c=col: self._sort_by(c),
             )
-            # Default column widths
-            width = 80 if col not in ("Name",) else 110
+            width = 100 if col not in ("Name",) else 130
             self.column(col, width=width, anchor="center")
 
         # Row striping tags
@@ -53,10 +58,6 @@ class SortableTreeview(ttk.Treeview):
         self.tag_configure("neu",  foreground=PALETTE["neutral"])
 
     def populate(self, rows: list[dict]) -> None:
-        """
-        Clear and repopulate from a list of matchup dicts.
-        Applies win/loss colouring based on win_rate_diff.
-        """
         self.delete(*self.get_children())
         for idx, data in enumerate(rows):
             diff = data.get("win_rate_diff", 0)
@@ -118,16 +119,17 @@ class StatusBar(tk.Frame):
     """Single-line status bar shown at the bottom of the window."""
 
     def __init__(self, parent, **kwargs):
-        super().__init__(parent, bg=PALETTE["panel"], **kwargs)
+        super().__init__(parent, bg=PALETTE["header_bg"], **kwargs)
         self._var = tk.StringVar(value="Ready.")
         tk.Label(
             self,
             textvariable=self._var,
-            bg=PALETTE["panel"],
-            fg=PALETTE["text_dim"],
+            bg=PALETTE["header_bg"],
+            fg=PALETTE["accent"],
             font=FONT_SMALL,
             anchor="w",
-            padx=6,
+            padx=8,
+            pady=3,
         ).pack(fill="x")
 
     def set(self, msg: str) -> None:
@@ -148,8 +150,11 @@ def apply_dark_theme(root: tk.Tk) -> ttk.Style:
         foreground=PALETTE["text"],
         fieldbackground=PALETTE["panel"],
         font=FONT_BODY,
-        rowheight=16,
+        rowheight=20,
         borderwidth=0,
+        relief="flat",
+        lightcolor=PALETTE["panel"],
+        darkcolor=PALETTE["panel"],
     )
     style.configure(
         "Treeview.Heading",
@@ -167,7 +172,6 @@ def apply_dark_theme(root: tk.Tk) -> ttk.Style:
         "Treeview.Heading",
         background=[("active", PALETTE["border"])],
     )
-    
     style.configure(
         "TCombobox",
         fieldbackground=PALETTE["entry_bg"],
@@ -175,21 +179,72 @@ def apply_dark_theme(root: tk.Tk) -> ttk.Style:
         foreground=PALETTE["text"],
         arrowcolor=PALETTE["accent"],
         bordercolor=PALETTE["border"],
+        lightcolor=PALETTE["entry_bg"],   # suppress 3-D highlight edges
+        darkcolor=PALETTE["entry_bg"],
         selectbackground=PALETTE["select"],
         selectforeground=PALETTE["text"],
+        relief="flat",
     )
     style.map(
         "TCombobox",
-        fieldbackground=[("readonly", PALETTE["entry_bg"])],
-        foreground=[("readonly", PALETTE["text"])],
+        fieldbackground=[
+            ("readonly", PALETTE["entry_bg"]),
+            ("active",   PALETTE["entry_bg"]),
+            ("focus",    PALETTE["entry_bg"]),
+        ],
+        background=[
+            ("active",   PALETTE["border"]),
+            ("pressed",  PALETTE["border"]),
+            ("readonly", PALETTE["button_bg"]),
+        ],
+        foreground=[
+            ("readonly", PALETTE["text"]),
+            ("active",   PALETTE["text"]),
+        ],
+        arrowcolor=[
+            ("active",   PALETTE["accent"]),
+            ("pressed",  PALETTE["accent"]),
+            ("readonly", PALETTE["accent"]),
+        ],
+        bordercolor=[
+            ("focus",    PALETTE["border"]),
+            ("active",   PALETTE["border"]),
+        ],
+        lightcolor=[
+            ("active",   PALETTE["entry_bg"]),
+            ("focus",    PALETTE["entry_bg"]),
+        ],
+        darkcolor=[
+            ("active",   PALETTE["entry_bg"]),
+            ("focus",    PALETTE["entry_bg"]),
+        ],
     )
 
-    style.configure(
-        "Vertical.TScrollbar",
-        background=PALETTE["panel"],
-        troughcolor=PALETTE["bg"],
-        arrowcolor=PALETTE["accent"],
-        bordercolor=PALETTE["bg"],
+    root.option_add("*TCombobox*Listbox.background",       PALETTE["entry_bg"])
+    root.option_add("*TCombobox*Listbox.foreground",       PALETTE["text"])
+    root.option_add("*TCombobox*Listbox.selectBackground", PALETTE["select"])
+    root.option_add("*TCombobox*Listbox.selectForeground", PALETTE["text"])
+    root.option_add("*TCombobox*Listbox.relief",           "flat")
+    root.option_add("*TCombobox*Listbox.borderWidth",      "0")
+
+    _sb_common = dict(
+        background=PALETTE["scroll_thumb"],
+        troughcolor=PALETTE["scroll_trough"],
+        bordercolor=PALETTE["scroll_thumb"],
+        lightcolor=PALETTE["scroll_thumb"],
+        darkcolor=PALETTE["scroll_thumb"],
+        arrowcolor=PALETTE["scroll_thumb_hover"],
+        relief="flat",
+        width=6,
+        arrowsize=6,
+    )
+    style.map(
+        "Horizontal.TScrollbar",
+        background=[
+            ("active",   PALETTE["scroll_thumb_hover"]),
+            ("pressed",  PALETTE["accent"]),
+            ("disabled", PALETTE["scroll_trough"]),
+        ],
     )
 
     style.configure(

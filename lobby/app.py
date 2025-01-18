@@ -52,6 +52,8 @@ class LobbyManagerApp:
         self.root = root
         self.root.title("Lobby Manager")
         self.root.resizable(True, True)
+        self.root.geometry("1100x780")
+        self.root.minsize(860, 600)
 
         apply_dark_theme(root)
         # ensure the window handle exists
@@ -78,7 +80,7 @@ class LobbyManagerApp:
         self._build_status_bar()
 
     def _build_left_panel(self) -> None:
-        left = tk.Frame(self.root, bg=PALETTE["panel"], padx=8, pady=8)
+        left = tk.Frame(self.root, bg=PALETTE["panel"], padx=10, pady=10)
         left.grid(row=0, column=0, sticky="nsew")
         left.columnconfigure(0, weight=1)
 
@@ -88,7 +90,7 @@ class LobbyManagerApp:
             bg=PALETTE["panel"],
             fg=PALETTE["accent"],
             font=FONT_TITLE,
-        ).grid(row=0, column=0, columnspan=2, pady=(0, 10), sticky="w")
+        ).grid(row=0, column=0, columnspan=2, pady=(0, 12), sticky="w")
 
         self._make_label(left, "Champion", row=1)
         self._champion_var = tk.StringVar()
@@ -100,9 +102,9 @@ class LobbyManagerApp:
             insertbackground=PALETTE["accent"],
             relief="flat",
             font=FONT_BODY,
-            width=18,
+            width=20,
         )
-        champ_entry.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(0, 6))
+        champ_entry.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(0, 8))
         champ_entry.bind("<Return>", lambda _: self._on_load())
 
         self._make_label(left, "Lane", row=3)
@@ -112,10 +114,10 @@ class LobbyManagerApp:
             textvariable=self._lane_var,
             values=LANES,
             state="readonly",
-            width=16,
+            width=18,
             font=FONT_BODY,
         )
-        lane_combo.grid(row=4, column=0, columnspan=2, sticky="ew", pady=(0, 8))
+        lane_combo.grid(row=4, column=0, columnspan=2, sticky="ew", pady=(0, 10))
 
         self._make_button(left, "Load",  self._on_load,  row=5, col=0)
         self._make_button(left, "Reset", self._on_reset, row=5, col=1)
@@ -132,7 +134,7 @@ class LobbyManagerApp:
             insertbackground=PALETTE["accent"],
             relief="flat",
             font=FONT_BODY,
-            width=18,
+            width=20,
         ).grid(row=8, column=0, sticky="ew", pady=(0, 4))
         self._make_button(left, "Apply Filter", self._on_filter, row=8, col=1)
 
@@ -151,7 +153,7 @@ class LobbyManagerApp:
             selectbackground=PALETTE["select"],
             selectforeground=PALETTE["text"],
             relief="flat",
-            font=FONT_SMALL,
+            font=FONT_BODY,
             activestyle="none",
             height=10,
         )
@@ -183,11 +185,17 @@ class LobbyManagerApp:
                 fg=PALETTE["accent"],
                 font=FONT_HEADER,
                 anchor="w",
-                padx=4,
+                padx=6,
+                pady=4,
             ).grid(row=0, column=0, columnspan=2, sticky="ew")
 
-            tree = SortableTreeview(frame, columns=self.COLUMNS, height=5)
-            tree.grid(row=1, column=0, sticky="nsew")
+            tree_frame = tk.Frame(frame, bg=PALETTE["panel"], bd=0, highlightthickness=0)
+            tree_frame.grid(row=1, column=0, sticky="nsew")
+            tree_frame.columnconfigure(0, weight=1)
+            tree_frame.rowconfigure(0, weight=1)
+
+            tree = SortableTreeview(tree_frame, columns=self.COLUMNS, height=5)
+            tree.grid(row=0, column=0, sticky="nsew")
 
             vsb = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
             vsb.grid(row=1, column=1, sticky="ns")
@@ -222,16 +230,16 @@ class LobbyManagerApp:
             activeforeground=PALETTE["accent"],
             relief="flat",
             font=FONT_HEADER,
-            padx=6,
-            pady=3,
+            padx=8,
+            pady=4,
             cursor="hand2",
         )
-        btn.grid(row=row, column=col, sticky="ew", padx=(0 if col == 0 else 2, 0), pady=2)
+        btn.grid(row=row, column=col, sticky="ew", padx=(0 if col == 0 else 3, 0), pady=2)
         return btn
 
     def _make_separator(self, parent: tk.Frame, row: int) -> None:
         tk.Frame(parent, height=1, bg=PALETTE["border"]).grid(
-            row=row, column=0, columnspan=2, sticky="ew", pady=6
+            row=row, column=0, columnspan=2, sticky="ew", pady=8
         )
 
     def _on_load(self) -> None:
