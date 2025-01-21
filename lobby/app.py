@@ -9,13 +9,14 @@ from lobby.widgets import (
     FONT_HEADER,
     FONT_SMALL,
     FONT_TITLE,
+    LaneChampionPanel,
     PALETTE,
     SortableTreeview,
     StatusBar,
     apply_dark_theme,
 )
 
-# win 11 color titlebar
+
 def _apply_dark_titlebar(root: tk.Tk) -> None:
     if sys.platform != "win32":
         return
@@ -52,8 +53,8 @@ class LobbyManagerApp:
         self.root = root
         self.root.title("Lobby Manager")
         self.root.resizable(True, True)
-        self.root.geometry("1100x780")
-        self.root.minsize(860, 600)
+        self.root.geometry("1200x780")
+        self.root.minsize(900, 600)
 
         apply_dark_theme(root)
         # ensure the window handle exists
@@ -70,12 +71,17 @@ class LobbyManagerApp:
         )
 
     def _build_ui(self) -> None:
-        self.root.columnconfigure(0, weight=0)   # left panel — fixed
-        self.root.columnconfigure(1, weight=1)   # right panel — expands
+        # col 0: left control panel (fixed)
+        # col 1: treeview area (expands)
+        # col 2: per-lane champion panels (fixed)
+        self.root.columnconfigure(0, weight=0)
+        self.root.columnconfigure(1, weight=1)
+        self.root.columnconfigure(2, weight=0)
         self.root.rowconfigure(0, weight=1)
-        self.root.rowconfigure(1, weight=0)      # status bar row
+        self.root.rowconfigure(1, weight=0)
 
         self._build_left_panel()
+        self._build_center_panel()
         self._build_right_panel()
         self._build_status_bar()
 
@@ -138,42 +144,18 @@ class LobbyManagerApp:
         ).grid(row=8, column=0, sticky="ew", pady=(0, 4))
         self._make_button(left, "Apply Filter", self._on_filter, row=8, col=1)
 
-        self._make_separator(left, row=9)
-
-        self._make_label(left, "Loaded", row=10)
-        list_frame = tk.Frame(left, bg=PALETTE["panel"])
-        list_frame.grid(row=11, column=0, columnspan=2, sticky="nsew", pady=(0, 4))
-        list_frame.columnconfigure(0, weight=1)
-        left.rowconfigure(11, weight=1)
-
-        self._loaded_listbox = tk.Listbox(
-            list_frame,
-            bg=PALETTE["entry_bg"],
-            fg=PALETTE["text_dim"],
-            selectbackground=PALETTE["select"],
-            selectforeground=PALETTE["text"],
-            relief="flat",
-            font=FONT_BODY,
-            activestyle="none",
-            height=10,
-        )
-        self._loaded_listbox.pack(side="left", fill="both", expand=True)
-
-        sb = ttk.Scrollbar(list_frame, orient="vertical", command=self._loaded_listbox.yview)
-        sb.pack(side="right", fill="y")
-        self._loaded_listbox.configure(yscrollcommand=sb.set)
-
-    def _build_right_panel(self) -> None:
-        right = tk.Frame(self.root, bg=PALETTE["bg"])
-        right.grid(row=0, column=1, sticky="nsew", padx=(4, 0))
-        right.columnconfigure(0, weight=1)
+    def _build_center_panel(self) -> None:
+        """Treeviews for all 5 lanes, center column."""
+        center = tk.Frame(self.root, bg=PALETTE["bg"])
+        center.grid(row=0, column=1, sticky="nsew", padx=(4, 2))
+        center.columnconfigure(0, weight=1)
         for i in range(len(LANES)):
-            right.rowconfigure(i, weight=1)
+            center.rowconfigure(i, weight=1)
 
         self._treeviews: dict[str, SortableTreeview] = {}
 
         for row_idx, lane in enumerate(LANES):
-            frame = tk.Frame(right, bg=PALETTE["bg"])
+            frame = tk.Frame(center, bg=PALETTE["bg"])
             frame.grid(row=row_idx, column=0, sticky="nsew", pady=2)
             frame.columnconfigure(0, weight=1)
             frame.rowconfigure(1, weight=1)
@@ -203,9 +185,25 @@ class LobbyManagerApp:
 
             self._treeviews[lane] = tree
 
+    def _build_right_panel(self) -> None:
+        """Per-lane champion panels, one per lane, right column."""
+        right = tk.Frame(self.root, bg=PALETTE["bg"], padx=4)
+        right.grid(row=0, column=2, sticky="nsew", padx=(2, 0))
+        right.columnconfigure(0, weight=1)
+        for i in range(len(LANES)):
+            right.rowconfigure(i, weight=1)
+
+        self._lane_panels: dict[str, LaneChampionPanel] = {}
+        self._lane_candidates: dict[str, list[str]] = {lane: [] for lane in LANES}
+
+        for row_idx, lane in enumerate(LANES):
+            panel = LaneChampionPanel(right, lane=lane)
+            panel.grid(row=row_idx, column=0, sticky="nsew", pady=2)
+            self._lane_panels[lane] = panel
+
     def _build_status_bar(self) -> None:
         self._status = StatusBar(self.root)
-        self._status.grid(row=1, column=0, columnspan=2, sticky="ew")
+        self._status.grid(row=1, column=0, columnspan=3, sticky="ew")
 
     def _make_label(self, parent: tk.Frame, text: str, row: int) -> None:
         tk.Label(
@@ -217,9 +215,7 @@ class LobbyManagerApp:
             anchor="w",
         ).grid(row=row, column=0, columnspan=2, sticky="w", pady=(4, 0))
 
-    def _make_button(
-        self, parent: tk.Frame, text: str, command, row: int, col: int
-    ) -> tk.Button:
+    def _make_button(self, parent: tk.Frame, text: str, command, row: int, col: int) -> tk.Button:
         btn = tk.Button(
             parent,
             text=text,
@@ -261,8 +257,14 @@ class LobbyManagerApp:
                 messagebox.showerror("Not Found", result.message)
             return
 
-        self._loaded_listbox.insert(tk.END, f"{result.champion} / {result.lane}")
         self._champion_var.set("")
+
+        panel = self._lane_panels[result.lane]
+        panel.set_selected(result.champion)
+        candidates = self._lane_candidates[result.lane]
+        if result.champion not in candidates:
+            candidates.append(result.champion)
+        panel.set_candidates(candidates)
         self._refresh_tables(result.matchups)
 
     def _on_filter(self) -> None:
@@ -277,8 +279,11 @@ class LobbyManagerApp:
 
     def _on_reset(self) -> None:
         result: ResetResult = self._ctrl.reset()
-        self._loaded_listbox.delete(0, tk.END)
         self._status.set(result.message)
+        self._lane_candidates = {lane: [] for lane in LANES}
+        for panel in self._lane_panels.values():
+            panel.set_selected(None)
+            panel.set_candidates([])
         self._refresh_tables(result.matchups)
 
     def _refresh_tables(self, data: dict[str, dict[str, dict]]) -> None:

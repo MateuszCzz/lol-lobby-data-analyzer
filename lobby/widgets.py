@@ -4,19 +4,19 @@ from tkinter import ttk
 
 # Colour palette
 PALETTE = {
-    "bg":          "#0a0e17",   # near-black background
-    "panel":       "#0f1923",   # slightly lighter panel
-    "border":      "#1e3a5f",   # steel-blue border / separator
-    "accent":      "#c89b3c",   # gold accent
-    "accent2":     "#1e90ff",   # electric blue
-    "text":        "#cdd6f4",   # primary text — soft white
-    "text_dim":    "#9aafc7",   # secondary / muted text
-    "header_bg":   "#122030",   # Treeview header background
+    "bg":          "#0a0e17",
+    "panel":       "#0f1923",
+    "border":      "#1e3a5f",
+    "accent":      "#c89b3c",
+    "accent2":     "#1e90ff",
+    "text":        "#cdd6f4",
+    "text_dim":    "#9aafc7",
+    "header_bg":   "#122030",
     "row_even":    "#0f1923",
     "row_odd":     "#0d1720",
     "select":      "#1e3a5f",
-    "win":         "#2ecc71",   # positive win-rate diff
-    "loss":        "#e74c3c",   # negative win-rate diff
+    "win":         "#2ecc71",
+    "loss":        "#e74c3c",
     "neutral":     "#7a8faa",
     "entry_bg":    "#0d1720",
     "button_bg":   "#122030",
@@ -32,6 +32,95 @@ FONT_HEADER  = ("Courier New", 11, "bold")
 FONT_BODY    = ("Courier New", 10)
 FONT_TITLE   = ("Courier New", 14, "bold")
 FONT_SMALL   = ("Courier New", 9)
+
+
+class LaneChampionPanel(tk.Frame):
+    """Compact panel showing the active champion for a lane and a list of
+    candidate champions
+    """
+
+    def __init__(self, parent: tk.Widget, lane: str, **kwargs) -> None:
+        super().__init__(parent, bg=PALETTE["panel"], bd=0, **kwargs)
+        self._lane = lane
+        self._build()
+
+    def _build(self) -> None:
+        self.columnconfigure(0, weight=1)
+
+        # Selected champion row
+        tk.Label(
+            self,
+            text="SELECTED",
+            bg=PALETTE["panel"],
+            fg=PALETTE["text_dim"],
+            font=FONT_SMALL,
+            anchor="w",
+        ).grid(row=0, column=0, sticky="ew", padx=4, pady=(4, 0))
+
+        self._selected_var = tk.StringVar(value="—")
+        tk.Label(
+            self,
+            textvariable=self._selected_var,
+            bg=PALETTE["entry_bg"],
+            fg=PALETTE["accent"],
+            font=FONT_HEADER,
+            anchor="w",
+            padx=6,
+            pady=2,
+        ).grid(row=1, column=0, sticky="ew", padx=4, pady=(0, 4))
+
+        # Separator
+        tk.Frame(self, height=1, bg=PALETTE["border"]).grid(
+            row=2, column=0, sticky="ew", padx=4
+        )
+
+        # Candidates label
+        tk.Label(
+            self,
+            text="CANDIDATES",
+            bg=PALETTE["panel"],
+            fg=PALETTE["text_dim"],
+            font=FONT_SMALL,
+            anchor="w",
+        ).grid(row=3, column=0, sticky="ew", padx=4, pady=(4, 0))
+
+        # Candidates
+        list_frame = tk.Frame(self, bg=PALETTE["panel"])
+        list_frame.grid(row=4, column=0, sticky="nsew", padx=4, pady=(0, 4))
+        list_frame.columnconfigure(0, weight=1)
+        self.rowconfigure(4, weight=1)
+
+        self._candidates_lb = tk.Listbox(
+            list_frame,
+            bg=PALETTE["entry_bg"],
+            fg=PALETTE["text_dim"],
+            selectbackground=PALETTE["select"],
+            selectforeground=PALETTE["text"],
+            relief="flat",
+            font=FONT_SMALL,
+            activestyle="none",
+            height=4,
+            exportselection=False,
+        )
+        self._candidates_lb.pack(side="left", fill="both", expand=True)
+
+        sb = ttk.Scrollbar(list_frame, orient="vertical", command=self._candidates_lb.yview)
+        sb.pack(side="right", fill="y")
+        self._candidates_lb.configure(yscrollcommand=sb.set)
+
+    def set_selected(self, champion: str | None) -> None:
+        """Update the selected champion label."""
+        self._selected_var.set(champion if champion else "—")
+
+    def set_candidates(self, champions: list[str]) -> None:
+        """Replace the candidates list (called by Riot LCU integration later)."""
+        self._candidates_lb.delete(0, tk.END)
+        for name in champions:
+            self._candidates_lb.insert(tk.END, name)
+
+    @property
+    def lane(self) -> str:
+        return self._lane
 
 
 class SortableTreeview(ttk.Treeview):
@@ -51,7 +140,6 @@ class SortableTreeview(ttk.Treeview):
             width = 100 if col not in ("Name",) else 130
             self.column(col, width=width, anchor="center")
 
-        # Row striping tags
         self.tag_configure("even", background=PALETTE["row_even"])
         self.tag_configure("odd",  background=PALETTE["row_odd"])
         self.tag_configure("pos",  foreground=PALETTE["win"])
@@ -102,19 +190,15 @@ class SortableTreeview(ttk.Treeview):
         rows.sort(key=key, reverse=not ascending)
         for idx, (_, iid) in enumerate(rows):
             self.move(iid, "", idx)
-            
-            # Restripe after sort
             new_tag = "even" if idx % 2 == 0 else "odd"
             existing = list(self.item(iid, "tags"))
-            
-            # Replace stripe tag, keep colour tag
             stripped = [t for t in existing if t not in ("even", "odd")]
             self.item(iid, tags=[new_tag] + stripped)
 
-        # show sort direction
         for c in self["columns"]:
             label = c + (" ▲" if c == col and ascending else (" ▼" if c == col else ""))
             self.heading(c, text=label)
+
 
 class StatusBar(tk.Frame):
     """Single-line status bar shown at the bottom of the window."""
@@ -136,7 +220,7 @@ class StatusBar(tk.Frame):
     def set(self, msg: str) -> None:
         self._var.set(msg)
 
-# apply_dark_theme, call once before building any widgets)
+
 def apply_dark_theme(root: tk.Tk) -> ttk.Style:
     """Configure ttk styles and root background for the dark HUD theme."""
     root.configure(bg=PALETTE["bg"])
@@ -144,7 +228,6 @@ def apply_dark_theme(root: tk.Tk) -> ttk.Style:
     style = ttk.Style(root)
     style.theme_use("clam")
 
-    # Treeview 
     style.configure(
         "Treeview",
         background=PALETTE["panel"],
@@ -174,7 +257,6 @@ def apply_dark_theme(root: tk.Tk) -> ttk.Style:
         background=[("active", PALETTE["border"])],
     )
 
-    # Combobox
     style.configure(
         "TCombobox",
         fieldbackground=PALETTE["entry_bg"],
@@ -240,9 +322,9 @@ def apply_dark_theme(root: tk.Tk) -> ttk.Style:
         relief="flat",
         arrowsize=6,
     )
-    
-    style.configure("Vertical.TScrollbar",   width=6,  **_sb_common) # type: ignore[arg-type]
-    style.configure("Horizontal.TScrollbar", width=6,  **_sb_common) # type: ignore[arg-type]
+
+    style.configure("Vertical.TScrollbar",   width=6,  **_sb_common)  # type: ignore[arg-type]
+    style.configure("Horizontal.TScrollbar", width=6,  **_sb_common)  # type: ignore[arg-type]
 
     _sb_map = [
         ("active",   PALETTE["scroll_thumb_hover"]),
