@@ -47,6 +47,16 @@ class LobbyController:
         """Snapshot of currently loaded (champion, lane) pairs."""
         return list(self._loaded_entries)
 
+    def _rebuild_raw_data(self) -> None:
+        """Re-load all entries from scratch and re-merge"""
+        self._raw_data = empty_grouped()
+        for champion, lane in self._loaded_entries:
+            raw = load_matchups(champion, lane)
+            if raw is None:
+                continue
+            grouped = group_by_lane(raw)
+            merge_grouped(self._raw_data, grouped)
+
     def load(self, query: str, lane: str) -> LoadResult:
         champion = resolve_champion_name(query)
         if champion is None:
@@ -59,17 +69,39 @@ class LobbyController:
         if raw is None:
             return LoadResult(ok=False, message=f"No data file found for {champion}/{lane}.")
 
-        grouped = group_by_lane(raw)
-        merge_grouped(self._raw_data, grouped)
         self._loaded_entries.append((champion, lane))
+        self._rebuild_raw_data()
 
-        total = sum(len(v) for v in grouped.values())
+        total = sum(len(v) for v in self._raw_data.values())
         return LoadResult(
             ok=True,
             message=f"Loaded {champion}/{lane} — {total} matchups.",
             champion=champion,
             lane=lane,
-            matchups=dict(self._raw_data),   # snapshot
+            matchups=dict(self._raw_data),
+        )
+
+    def set_champion_for_lane(self, lane: str, champion: str) -> LoadResult:
+        """Replace the currently loaded champion for a given lane with a new one"""
+        resolved = resolve_champion_name(champion)
+        if resolved is None:
+            return LoadResult(ok=False, message=f"No champion matched '{champion}'.")
+
+        raw = load_matchups(resolved, lane)
+        if raw is None:
+            return LoadResult(ok=False, message=f"No data file found for {resolved}/{lane}.")
+
+        self._loaded_entries = [(c, l) for c, l in self._loaded_entries if l != lane]
+        self._loaded_entries.append((resolved, lane))
+        self._rebuild_raw_data()
+
+        total = sum(len(v) for v in self._raw_data.values())
+        return LoadResult(
+            ok=True,
+            message=f"Switched {lane} to {resolved} — {total} matchups.",
+            champion=resolved,
+            lane=lane,
+            matchups=dict(self._raw_data),
         )
 
     def apply_filter(self, min_games_raw: str) -> FilterResult:
