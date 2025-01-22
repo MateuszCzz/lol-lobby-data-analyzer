@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 from config import LANES
 from lobby.controller import FilterResult, LobbyController, LoadResult, ResetResult
+from lobby.connection import RiotLCUClient
 from lobby.widgets import (
     FONT_BODY,
     FONT_HEADER,
@@ -70,6 +71,11 @@ class LobbyManagerApp:
             else "000_play_rates.json not found — play rate hints unavailable."
         )
 
+        # Start listener
+        self._lcu = RiotLCUClient(on_state_change=self._on_champ_select_change)
+        self._lcu.start()
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close_window)
+        
     def _build_ui(self) -> None:
         # col 0: left control panel (fixed)
         # col 1: treeview area (expands)
@@ -187,7 +193,7 @@ class LobbyManagerApp:
 
     def _build_right_panel(self) -> None:
         """Per-lane champion panels, one per lane, right column."""
-        right = tk.Frame(self.root, bg=PALETTE["bg"], padx=4)
+        right = tk.Frame(self.root, bg=PALETTE["bg"], padx=4, width=180)
         right.grid(row=0, column=2, sticky="nsew", padx=(2, 0))
         right.grid_propagate(False)   # never let children resize this frame
         right.columnconfigure(0, weight=1)
@@ -251,6 +257,10 @@ class LobbyManagerApp:
             row=row, column=0, columnspan=2, sticky="ew", pady=8
         )
 
+    def _on_close_window(self) -> None:
+        self._lcu.stop()
+        self.root.destroy()
+
     def _on_candidate_selected(self, lane: str, champion: str) -> None:
         """Called when the user double-clicks a candidate to swap the active champion."""
         result: LoadResult = self._ctrl.set_champion_for_lane(lane, champion)
@@ -265,6 +275,52 @@ class LobbyManagerApp:
         self._lane_panels[lane].set_selected(None)
         self._status.set(result.message)
         self._refresh_tables(result.matchups)
+
+    def _on_champ_select_change(self, state) -> None:
+        """
+        Called when enemy team locks in a champion.
+        Adds the enemy champion to candidates for all lanes with pick rate.
+        """
+        # Get enemy picks from the LCU state
+        enemy_picks = state.enemy_picks if hasattr(state, 'enemy_picks') else []
+
+        if not enemy_picks:
+            return
+        
+        # Get all play rates data
+        all_play_rates: dict = self._ctrl._play_rates
+        
+        for enemy_champ in enemy_picks:
+
+            # Normalize champion name: remove quotes and spaces, lowercase
+            normalized_name = enemy_champ.replace("'", "").replace(" ", "").lower()
+            
+            # Find the champion in play_rates (case-insensitive match)
+            champ_key = None
+            for key in all_play_rates.keys():
+                if key.replace("'", "").replace(" ", "").lower() == normalized_name:
+                    champ_key = key
+                    break
+            
+            if not champ_key:
+                continue
+            
+            champ_rates = all_play_rates.get(champ_key, {})
+            if not isinstance(champ_rates, dict):
+                continue
+            
+            # Add the champion to candidates for ALL lanes
+            for lane in LANES:
+                candidates = self._lane_candidates[lane]
+                
+                # Avoid duplicates
+                if champ_key not in candidates:
+                    candidates.append(champ_key)
+                    # Update the panel to show the new candidate
+                    self._lane_panels[lane].set_candidates(candidates)
+            
+            # Print for debugging
+            print(f"[LOBBY] Added enemy pick '{champ_key}' to all lane candidates")
 
     def _on_load(self) -> None:
         query = self._champion_var.get().strip()
