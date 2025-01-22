@@ -189,6 +189,7 @@ class LobbyManagerApp:
         """Per-lane champion panels, one per lane, right column."""
         right = tk.Frame(self.root, bg=PALETTE["bg"], padx=4)
         right.grid(row=0, column=2, sticky="nsew", padx=(2, 0))
+        right.grid_propagate(False)   # never let children resize this frame
         right.columnconfigure(0, weight=1)
         for i in range(len(LANES)):
             right.rowconfigure(i, weight=1)
