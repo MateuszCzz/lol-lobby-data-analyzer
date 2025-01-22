@@ -39,15 +39,29 @@ class LaneChampionPanel(tk.Frame):
     candidate champions
     """
 
-    def __init__(self, parent: tk.Widget, lane: str, **kwargs) -> None:
+    def __init__(
+        self,
+        parent: tk.Widget,
+        lane: str,
+        play_rates: dict[str, float] | None = None,
+        on_select_candidate=None,
+        on_clear_lane=None,
+        **kwargs,
+    ) -> None:
         super().__init__(parent, bg=PALETTE["panel"], bd=0, **kwargs)
         self._lane = lane
+        self._play_rates: dict[str, float] = play_rates or {}
+        self._on_select_candidate = on_select_candidate  
+        self._on_clear_lane = on_clear_lane               
+        self._ordered: list[str] = []
+
+        self._highlighted: int | None = None
         self._build()
 
     def _build(self) -> None:
         self.columnconfigure(0, weight=1)
 
-        # Selected champion row
+        # Selected champion row + X
         tk.Label(
             self,
             text="SELECTED",
@@ -57,9 +71,13 @@ class LaneChampionPanel(tk.Frame):
             anchor="w",
         ).grid(row=0, column=0, sticky="ew", padx=4, pady=(4, 0))
 
+        selected_row = tk.Frame(self, bg=PALETTE["entry_bg"])
+        selected_row.grid(row=1, column=0, sticky="ew", padx=4, pady=(0, 4))
+        selected_row.columnconfigure(0, weight=1)
+
         self._selected_var = tk.StringVar(value="—")
         tk.Label(
-            self,
+            selected_row,
             textvariable=self._selected_var,
             bg=PALETTE["entry_bg"],
             fg=PALETTE["accent"],
@@ -67,7 +85,24 @@ class LaneChampionPanel(tk.Frame):
             anchor="w",
             padx=6,
             pady=2,
-        ).grid(row=1, column=0, sticky="ew", padx=4, pady=(0, 4))
+        ).grid(row=0, column=0, sticky="ew")
+
+        self._clear_btn = tk.Button(
+            selected_row,
+            text="×",
+            command=self._on_clear_click,
+            bg=PALETTE["entry_bg"],
+            fg=PALETTE["accent"],
+            activebackground=PALETTE["border"],
+            activeforeground=PALETTE["accent"],
+            relief="flat",
+            font=FONT_HEADER,
+            padx=4,
+            pady=0,
+            cursor="hand2",
+            bd=0,
+        )
+        self._clear_btn.grid(row=0, column=1, sticky="e", padx=(0, 4))
 
         # Separator
         tk.Frame(self, height=1, bg=PALETTE["border"]).grid(
@@ -108,15 +143,61 @@ class LaneChampionPanel(tk.Frame):
         sb.pack(side="right", fill="y")
         self._candidates_lb.configure(yscrollcommand=sb.set)
 
+        self._candidates_lb.bind("<Button-1>", self._on_lb_click)
+
+    def _row_label(self, champion: str) -> str:
+        rate = self._play_rates.get(champion)
+        if rate is not None:
+            return f"{champion:<14} {rate:>5.1f}%"
+        return champion
+
+    def _render_list(self) -> None:
+        """Redraw the listbox from self._ordered, preserving highlight."""
+        self._candidates_lb.delete(0, tk.END)
+        for name in self._ordered:
+            self._candidates_lb.insert(tk.END, self._row_label(name))
+        if self._highlighted is not None and self._highlighted < len(self._ordered):
+            self._candidates_lb.selection_set(self._highlighted)
+
+    def _on_lb_click(self, event: tk.Event) -> None:
+        idx = self._candidates_lb.nearest(event.y)
+        if idx < 0 or idx >= len(self._ordered):
+            return
+
+        if self._highlighted == idx:
+            # Second click on already-highlighted row → confirm selection
+            champion = self._ordered[idx]
+            self._highlighted = None
+            self._candidates_lb.selection_clear(0, tk.END)
+            if self._on_select_candidate:
+                self._on_select_candidate(self._lane, champion)
+        else:
+            # First click → just highlight
+            self._highlighted = idx
+            self._candidates_lb.selection_clear(0, tk.END)
+            self._candidates_lb.selection_set(idx)
+
+    def _on_clear_click(self) -> None:
+        if self._on_clear_lane:
+            self._on_clear_lane(self._lane)
+
     def set_selected(self, champion: str | None) -> None:
         """Update the selected champion label."""
         self._selected_var.set(champion if champion else "—")
 
     def set_candidates(self, champions: list[str]) -> None:
-        """Replace the candidates list (called by Riot LCU integration later)."""
-        self._candidates_lb.delete(0, tk.END)
-        for name in champions:
-            self._candidates_lb.insert(tk.END, name)
+        """Replace the candidates list, sorted by play rate"""
+        def _rate(name: str) -> float:
+            return self._play_rates.get(name, 0.0)
+
+        self._ordered = sorted(champions, key=_rate, reverse=True)
+        self._highlighted = None
+        self._render_list()
+
+    def update_play_rates(self, play_rates: dict[str, float]) -> None:
+        """Refresh play rate data and re-render (called if rates load late)."""
+        self._play_rates = play_rates
+        self._render_list()
 
     @property
     def lane(self) -> str:

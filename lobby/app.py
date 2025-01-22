@@ -195,9 +195,21 @@ class LobbyManagerApp:
 
         self._lane_panels: dict[str, LaneChampionPanel] = {}
         self._lane_candidates: dict[str, list[str]] = {lane: [] for lane in LANES}
+        all_play_rates: dict = self._ctrl._play_rates
 
         for row_idx, lane in enumerate(LANES):
-            panel = LaneChampionPanel(right, lane=lane)
+            lane_rates = {
+                champ: rates.get(lane, 0.0)
+                for champ, rates in all_play_rates.items()
+                if isinstance(rates, dict)
+            }
+            panel = LaneChampionPanel(
+                right,
+                lane=lane,
+                play_rates=lane_rates,
+                on_select_candidate=self._on_candidate_selected,
+                on_clear_lane=self._on_clear_lane,
+            )
             panel.grid(row=row_idx, column=0, sticky="nsew", pady=2)
             self._lane_panels[lane] = panel
 
@@ -237,6 +249,21 @@ class LobbyManagerApp:
         tk.Frame(parent, height=1, bg=PALETTE["border"]).grid(
             row=row, column=0, columnspan=2, sticky="ew", pady=8
         )
+
+    def _on_candidate_selected(self, lane: str, champion: str) -> None:
+        """Called when the user double-clicks a candidate to swap the active champion."""
+        result: LoadResult = self._ctrl.set_champion_for_lane(lane, champion)
+        self._status.set(result.message)
+        if result.ok:
+            self._lane_panels[lane].set_selected(result.champion)
+            self._refresh_tables(result.matchups)
+
+    def _on_clear_lane(self, lane: str) -> None:
+        """Clear the active selection for a lane without removing candidates."""
+        result: ResetResult = self._ctrl.clear_lane(lane)
+        self._lane_panels[lane].set_selected(None)
+        self._status.set(result.message)
+        self._refresh_tables(result.matchups)
 
     def _on_load(self) -> None:
         query = self._champion_var.get().strip()

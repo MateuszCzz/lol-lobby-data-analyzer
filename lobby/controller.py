@@ -81,6 +81,15 @@ class LobbyController:
             matchups=dict(self._raw_data),
         )
 
+    def clear_lane(self, lane: str) -> ResetResult:
+        """Remove the loaded entry for a specific lane and rebuild data."""
+        self._loaded_entries = [(c, l) for c, l in self._loaded_entries if l != lane]
+        self._rebuild_raw_data()
+        return ResetResult(
+            message=f"Cleared {lane} selection.",
+            matchups=dict(self._raw_data),
+        )
+
     def set_champion_for_lane(self, lane: str, champion: str) -> LoadResult:
         """Replace the currently loaded champion for a given lane with a new one"""
         resolved = resolve_champion_name(champion)
