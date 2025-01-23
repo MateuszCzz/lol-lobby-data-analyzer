@@ -3,7 +3,7 @@ import sys
 import tkinter as tk
 from tkinter import messagebox, ttk
 from config import LANES
-from lobby.controller import FilterResult, LobbyController, LoadResult, ResetResult
+from lobby.controller import FilterResult, LobbyController, LoadResult, ResetResult, UnavailableUpdate
 from lobby.connection import RiotLCUClient
 from lobby.widgets import (
     FONT_BODY,
@@ -278,16 +278,36 @@ class LobbyManagerApp:
 
     def _on_champ_select_change(self, state) -> None:
         """
-        Called when enemy team locks in a champion.
-        Adds the enemy champion to candidates for all lanes with pick rate.
+        Called when lobby session changes: picks, bans.
         """
-        # Get enemy picks from the LCU state
-        enemy_picks = state.enemy_picks if hasattr(state, 'enemy_picks') else []
 
-        if not enemy_picks:
+        # set of all champions no longer avilable for selection
+        unavailable = []
+
+        # Collect all banned champions
+        banned = state.banned_champions if hasattr(state, 'banned_champions') else []
+        unavailable.extend(banned)
+
+        # Collect all locked enemy champions
+        enemy_picks = state.enemy_picks if hasattr(state, 'enemy_picks') else []
+        unavailable.extend(enemy_picks)
+
+        # No bans or enemy picks
+        if not unavailable:
             return
+
+        # Update controller with unavailable champions
+        result: UnavailableUpdate = self._ctrl.update_unavailable_champions(unavailable)
+        self._status.set(result.message)
         
-        # Get all play rates data
+        # Re-apply current filter to get filtered matchups
+        filter_result: FilterResult = self._ctrl.apply_filter(self._min_games_var.get())
+        if filter_result.ok:
+            self._refresh_tables(filter_result.matchups)
+        
+        print(f"[LOBBY] Unavailable champions: {', '.join(unavailable)}")
+
+        # Add enemy picks to candidates for all lanes
         all_play_rates: dict = self._ctrl._play_rates
         
         for enemy_champ in enemy_picks:
@@ -365,6 +385,8 @@ class LobbyManagerApp:
         result: ResetResult = self._ctrl.reset()
         self._status.set(result.message)
         self._lane_candidates = {lane: [] for lane in LANES}
+        # Clear unavailable champions
+        self._ctrl.update_unavailable_champions([])
         for panel in self._lane_panels.values():
             panel.set_selected(None)
             panel.set_candidates([])

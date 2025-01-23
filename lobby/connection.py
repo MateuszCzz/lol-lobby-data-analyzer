@@ -209,11 +209,24 @@ class RiotLCUClient:
         self._state.locked_champions = {}
         self._state.enemy_picks = []
 
+        # Extract banned champions from actions 
+        banned_from_actions = []
+        for group in data.get("actions", []):
+            for act in group:
+                if act.get("type") == "ban" and act.get("completed"):
+                    cid = act.get("championId", 0)
+                    if cid:
+                        banned_from_actions.append(cid)
+
         # Extract banned champions
         bans_data = data.get("bans", {})
         all_bans = bans_data.get("myTeamBans", []) + bans_data.get("theirTeamBans", [])
+        all_bans = [c for c in all_bans if c]
+        
+        # Combine both sources (actions takes precedence)
+        all_banned_ids = banned_from_actions if banned_from_actions else all_bans
         self._state.banned_champions = [
-            self._champ_map.get(cid, str(cid)) for cid in all_bans if cid
+            self._champ_map.get(cid, str(cid)) for cid in all_banned_ids
         ]
 
         # Extract locked/picked champions from actions
