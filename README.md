@@ -1,7 +1,9 @@
-# League of Legends Real-Time Lobby Analysis
+# Desktop app for Real-Time Lobby Analysis in League of Legends
 <center><img src="Application.png" alt="App Screenshot" width="500" height="300"></center>
 
-A Python based data-driven tool that collects and processes champion statistics from [LoLalytics](https://lolalytics.com), then queries the resulting datasets in real time during champion select to provide assistance in selecting optimal choices based on actions of the opposite players.
+A Python based tool that collects and processes champion statistics from [LoLalytics](https://lolalytics.com), then queries the resulting datasets in real time during champion select to provide assistance in selecting optimal choices based on actions of the opposite players.
+
+> 🇰🇷 Korean fork of the application: [LoLalytics-Helper](https://github.com/nm-leo1229/LoLalytics-Helper)
 
 ## Pipeline
 
